@@ -15,8 +15,23 @@ button,input,select,textarea{font-family:inherit}
 
 .header{background:var(--bg2);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
 .logo{font-size:1.3rem;font-weight:800;background:linear-gradient(135deg,var(--accent2),var(--pink),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hdr-right{display:flex;align-items:center;gap:10px}
 .badges{display:flex;gap:8px}.badge{padding:4px 12px;border-radius:16px;font-weight:700;font-size:.75rem}
 .b-day{background:var(--accent);color:#fff}.b-str{background:var(--green);color:#000}
+
+.uavt{display:flex;align-items:center;gap:7px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:4px 11px 4px 4px;cursor:pointer;color:var(--text);font-size:.78rem;font-weight:600;transition:border-color .12s;border:none}
+.uavt:hover{border:1px solid var(--accent)!important}
+.u-av{width:24px;height:24px;border-radius:50%;object-fit:cover;background:var(--accent);display:block}
+.u-init{width:24px;height:24px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.65rem;color:#fff;font-weight:700;flex-shrink:0}
+
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center}
+.modal{background:var(--bg2);border-radius:var(--r);padding:22px;max-width:380px;width:calc(100% - 32px);border:1px solid var(--border)}
+.modal-title{font-size:1rem;font-weight:700;margin-bottom:14px;color:var(--accent2)}
+.urow{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:8px;border:1px solid var(--border);cursor:pointer;transition:all .12s;margin-bottom:5px}
+.urow:hover{border-color:var(--accent);background:var(--bg3)}
+.urow.active{border-color:var(--green)}
+.urow-av{width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0}
+.urow-init{width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.8rem;color:#fff;font-weight:700;flex-shrink:0}
 
 .nav{display:flex;gap:2px;padding:8px 24px;background:var(--bg2);border-bottom:1px solid var(--border);overflow-x:auto}
 .nav button{padding:8px 16px;border:none;background:none;color:var(--text2);cursor:pointer;border-radius:8px;font-size:.82rem;white-space:nowrap;transition:all .15s}
@@ -79,7 +94,9 @@ button,input,select,textarea{font-family:inherit}
 .pc .av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;flex-shrink:0}
 
 .hm{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;max-width:380px}
-.hc{aspect-ratio:1;border-radius:2px;background:var(--bg)}.h1{background:rgba(16,185,129,.2)}.h2{background:rgba(16,185,129,.4)}.h3{background:rgba(16,185,129,.6)}.h4{background:rgba(16,185,129,.85)}
+.hc{aspect-ratio:1;border-radius:2px;background:var(--bg);transition:opacity .1s}
+.hc[data-hd]{cursor:pointer}.hc[data-hd]:hover{opacity:.65}
+.h1{background:rgba(16,185,129,.2)}.h2{background:rgba(16,185,129,.4)}.h3{background:rgba(16,185,129,.6)}.h4{background:rgba(16,185,129,.85)}
 
 .ja{width:100%;min-height:100px;background:var(--bg);border:1px solid var(--bg3);border-radius:7px;padding:12px;color:var(--text);font-size:.85rem;resize:vertical;line-height:1.4}
 .ja:focus{outline:none;border-color:var(--accent)}
@@ -100,13 +117,16 @@ button,input,select,textarea{font-family:inherit}
 
 <header class="header">
   <div class="logo">Project Change</div>
-  <div class="badges">
-    <span class="badge b-day" id="bDay">Day 1/60</span>
-    <span class="badge b-str" id="bStr">0 streak</span>
+  <div class="hdr-right">
+    <div class="badges">
+      <span class="badge b-day" id="bDay">Day 1/60</span>
+      <span class="badge b-str" id="bStr">0 streak</span>
+    </div>
+    <button class="uavt" id="uBtn" style="display:none" title="Switch profile"></button>
   </div>
 </header>
 
-<nav class="nav" id="nav"></nav>
+<nav class="nav" id="nav" style="display:none"></nav>
 <main class="wrap" id="main"></main>
 <div class="toast" id="toast"></div>
 
@@ -114,23 +134,190 @@ button,input,select,textarea{font-family:inherit}
 (function() {
   "use strict";
 
-  var KEY = "pc_v3";
+  // ── User management ──────────────────────────────────────────
+  var ACTIVE_KEY = "pc_active_user";
+  var USERS_KEY  = "pc_users";
+  var LEGACY_KEY = "pc_v3";
+
+  function getUserKey(u) { return "pc_v3_" + u; }
+  function getUsers() { try { return JSON.parse(localStorage.getItem(USERS_KEY)) || []; } catch(e) { return []; } }
+  function addUserToList(u) { var list = getUsers(); if (list.indexOf(u) === -1) { list.push(u); localStorage.setItem(USERS_KEY, JSON.stringify(list)); } }
+
+  var activeUser = localStorage.getItem(ACTIVE_KEY) || "";
+
+  // ── Data defaults ─────────────────────────────────────────────
   var DEF = {startDate:"2026-05-07",done:{},daily:{},lc:[],recap:[],journals:{},projects:[],custom:{},stats:{lc:0,gh:0,hf:0},streak:0,last:null,heat:{}};
   var D;
-  try { D = JSON.parse(localStorage.getItem(KEY)); if(!D) throw 0; D = Object.assign({}, DEF, D); }
-  catch(e) { D = Object.assign({}, DEF); }
-  function save() { localStorage.setItem(KEY, JSON.stringify(D)); }
 
+  function loadData() {
+    var k;
+    if (activeUser) {
+      k = getUserKey(activeUser);
+      // one-time migration of legacy data for the first user to log in
+      if (!localStorage.getItem(k)) {
+        var legacy = localStorage.getItem(LEGACY_KEY);
+        if (legacy) localStorage.setItem(k, legacy);
+      }
+    } else {
+      k = LEGACY_KEY;
+    }
+    try { D = JSON.parse(localStorage.getItem(k)); if (!D) throw 0; D = Object.assign({}, DEF, D); }
+    catch(e) { D = Object.assign({}, DEF); }
+  }
+
+  function save() {
+    var k = activeUser ? getUserKey(activeUser) : LEGACY_KEY;
+    localStorage.setItem(k, JSON.stringify(D));
+  }
+
+  loadData();
+
+  // ── Helpers ───────────────────────────────────────────────────
   function $(id) { return document.getElementById(id); }
   function today() { return new Date().toISOString().split("T")[0]; }
   function dayNum() { var s = new Date(D.startDate+"T00:00:00"), n = new Date(); return Math.max(1, Math.min(60, Math.floor((n-s)/864e5)+1)); }
   function weekNum() { return Math.min(8, Math.ceil(dayNum()/7.5)); }
-  function toast(m) { var t = $("toast"); t.textContent = m; t.classList.add("vis"); setTimeout(function(){t.classList.remove("vis")}, 2000); }
+  function toast(m, color) { var t = $("toast"); t.textContent = m; t.style.background = color || "var(--green)"; t.style.color = color ? "#fff" : "#000"; t.classList.add("vis"); setTimeout(function(){t.classList.remove("vis")}, 2200); }
   function recAct() { var k = today(); D.heat[k] = (D.heat[k]||0)+1; save(); }
   function pct(a,b) { return b ? Math.round(a/b*100) : 0; }
   function tc(tag) { return tag==="easy"?"te":tag==="medium"?"tm2":tag==="hard"?"th":tag==="theory"?"tth":"tp"; }
   function esc(s) { return s.replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
+  // ── User display ──────────────────────────────────────────────
+  function updateUserDisplay() {
+    var btn = $("uBtn");
+    if (!activeUser) { btn.style.display = "none"; return; }
+    btn.style.display = "flex";
+    btn.style.alignItems = "center";
+    btn.style.gap = "7px";
+    btn.style.background = "var(--bg3)";
+    btn.style.borderRadius = "20px";
+    btn.style.padding = "4px 11px 4px 4px";
+    btn.style.border = "1px solid var(--border)";
+    btn.style.cursor = "pointer";
+    btn.style.fontSize = ".78rem";
+    btn.style.fontWeight = "600";
+    btn.style.color = "var(--text)";
+
+    var initials = activeUser.charAt(0).toUpperCase();
+    var img = document.createElement("img");
+    img.className = "u-av";
+    img.src = "https://github.com/" + activeUser + ".png?size=24";
+    img.onerror = function() {
+      img.parentNode.replaceChild(
+        Object.assign(document.createElement("div"), {className:"u-init", textContent: initials}),
+        img
+      );
+    };
+    btn.innerHTML = "";
+    btn.appendChild(img);
+    var span = document.createElement("span");
+    span.textContent = activeUser;
+    btn.appendChild(span);
+  }
+
+  function showProfileModal() {
+    var users = getUsers();
+    var ov = document.createElement("div");
+    ov.className = "overlay";
+    var h = '<div class="modal"><div class="modal-title">Switch Profile</div>';
+    users.forEach(function(u) {
+      h += '<div class="urow' + (u === activeUser ? " active" : "") + '" data-su="' + u + '">';
+      h += '<img src="https://github.com/' + u + '.png?size=32" class="urow-av" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'">';
+      h += '<div class="urow-init" style="display:none">' + u.charAt(0).toUpperCase() + '</div>';
+      h += '<div style="flex:1"><div style="font-size:.88rem;font-weight:600">' + u + '</div>' + (u === activeUser ? '<div style="font-size:.72rem;color:var(--green)">Active</div>' : '') + '</div>';
+      if (u === activeUser) h += '<span style="color:var(--green);font-size:.8rem">✓</span>';
+      h += '</div>';
+    });
+    h += '<div style="border-top:1px solid var(--border);margin:12px 0 10px"></div>';
+    h += '<div style="display:flex;gap:6px"><input class="inp" id="newUInp" placeholder="Add GitHub username" style="flex:1"><button class="btn bp bs" id="newUBtn">Add</button></div>';
+    h += '<button class="btn bo" id="logoutBtn" style="margin-top:8px;width:100%;border-color:var(--red);color:var(--red)">Log Out</button>';
+    h += '<button class="btn bo" id="closeModal" style="margin-top:5px;width:100%">Cancel</button>';
+    h += '</div>';
+    ov.innerHTML = h;
+    document.body.appendChild(ov);
+
+    ov.querySelectorAll("[data-su]").forEach(function(el) {
+      el.addEventListener("click", function() {
+        var u = el.getAttribute("data-su");
+        if (u !== activeUser) { activeUser = u; localStorage.setItem(ACTIVE_KEY, u); loadData(); updateUserDisplay(); render(); }
+        document.body.removeChild(ov);
+      });
+    });
+    $("newUBtn").addEventListener("click", function() {
+      var u = $("newUInp").value.trim().toLowerCase();
+      if (!u || !/^[a-z0-9_-]+$/i.test(u)) return;
+      activeUser = u; localStorage.setItem(ACTIVE_KEY, u); addUserToList(u); loadData(); updateUserDisplay();
+      document.body.removeChild(ov); render();
+    });
+    $("newUInp").addEventListener("keydown", function(e) { if (e.key === "Enter") $("newUBtn").click(); });
+    $("logoutBtn").addEventListener("click", function() {
+      activeUser = ""; localStorage.removeItem(ACTIVE_KEY);
+      $("nav").style.display = "none"; updateUserDisplay();
+      document.body.removeChild(ov); render();
+    });
+    $("closeModal").addEventListener("click", function() { document.body.removeChild(ov); });
+    ov.addEventListener("click", function(e) { if (e.target === ov) document.body.removeChild(ov); });
+  }
+
+  // ── Login screen ──────────────────────────────────────────────
+  function renderLogin() {
+    $("nav").style.display = "none";
+    $("uBtn").style.display = "none";
+    var users = getUsers();
+    var h = '<div style="max-width:420px;margin:60px auto"><div class="card" style="padding:28px">';
+    h += '<div style="font-size:1.5rem;font-weight:800;background:linear-gradient(135deg,var(--accent2),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px">Project Change</div>';
+    h += '<p style="color:var(--text2);font-size:.84rem;margin-bottom:22px">60-Day MAANG + AI/ML Transformation Tracker</p>';
+    if (users.length) {
+      h += '<div style="font-size:.72rem;color:var(--text2);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Continue as</div>';
+      users.forEach(function(u) {
+        h += '<div class="urow" data-login-user="' + u + '">';
+        h += '<img src="https://github.com/' + u + '.png?size=32" class="urow-av" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'">';
+        h += '<div class="urow-init" style="display:none">' + u.charAt(0).toUpperCase() + '</div>';
+        h += '<span style="font-size:.9rem;font-weight:600">' + u + '</span></div>';
+      });
+      h += '<div style="border-top:1px solid var(--border);margin:16px 0 14px"></div>';
+      h += '<div style="font-size:.72rem;color:var(--text2);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">New profile</div>';
+    } else {
+      h += '<div style="font-size:.82rem;color:var(--text2);margin-bottom:10px">Enter your GitHub username to start tracking</div>';
+    }
+    h += '<div style="display:flex;gap:8px"><input class="inp" id="loginInp" placeholder="GitHub username (e.g. hitman567)" style="flex:1"><button class="btn bp" id="loginBtn">Start</button></div>';
+    h += '<p id="loginErr" style="color:var(--red);font-size:.76rem;margin-top:8px;min-height:18px"></p>';
+    h += '</div></div>';
+    $("main").innerHTML = h;
+
+    document.querySelectorAll("[data-login-user]").forEach(function(el) {
+      el.addEventListener("click", function() { doLogin(el.getAttribute("data-login-user")); });
+    });
+    $("loginBtn").addEventListener("click", function() {
+      var u = ($("loginInp").value || "").trim().toLowerCase();
+      if (!u) { $("loginErr").textContent = "Please enter a username."; return; }
+      if (!/^[a-z0-9_-]+$/i.test(u)) { $("loginErr").textContent = "Invalid GitHub username."; return; }
+      doLogin(u);
+    });
+    $("loginInp").addEventListener("keydown", function(e) { if (e.key === "Enter") $("loginBtn").click(); });
+  }
+
+  function doLogin(username) {
+    activeUser = username.toLowerCase();
+    localStorage.setItem(ACTIVE_KEY, activeUser);
+    addUserToList(activeUser);
+    loadData();
+    updateUserDisplay();
+    $("nav").style.display = "";
+    render();
+  }
+
+  // ── Reset helpers ─────────────────────────────────────────────
+  function resetDay(date) {
+    delete D.heat[date];
+    delete D.daily[date];
+    delete D.custom[date];
+    delete D.journals[date];
+    save();
+  }
+
+  // ── Curriculum data ───────────────────────────────────────────
   var CUR = [
     {w:1,t:"Foundation: Arrays, Strings & ML Setup",dsa:["Two Sum, Valid Anagram, Contains Duplicate|easy","Best Time to Buy & Sell Stock|easy","Two Pointers: Valid Palindrome, 3Sum|medium","Sliding Window: Max Subarray, Min Window Substring|medium","HashMap: Group Anagrams, Top K Frequent|medium"],sd:["Scalability: vertical vs horizontal|theory","Load balancing strategies|theory","Caching: Redis, Memcached, invalidation|theory","Database: SQL vs NoSQL trade-offs|theory"],ai:["Setup: Python ML env, HuggingFace, keys|project","Transformers: pipelines, tokenizers|theory","Inference with Llama, Mistral|project","Prompt engineering with Claude API|theory"],pj:{n:"FastAPI Learning Tracker API",d:"Backend with FastAPI + SQLite",tk:"Python, FastAPI, Pydantic, SQLite"}},
     {w:2,t:"Stack, Queue, Linked Lists & API Design",dsa:["Stack: Valid Parentheses, Min Stack|medium","Queue using Stacks|easy","LinkedList: Reverse, Merge, Cycle|medium","LinkedList: Remove Nth, Reorder|medium","Largest Rectangle in Histogram|hard"],sd:["REST API design best practices|theory","Design URL Shortener|medium","Rate Limiting: token bucket|theory","CDN and DNS fundamentals|theory"],ai:["Embeddings: sentence-transformers|theory","Vector DBs: ChromaDB, FAISS|project","RAG fundamentals|theory","Build RAG with open-source LLM|project"],pj:{n:"RAG-Powered Doc Q&A",d:"Document Q&A with OS embeddings + LLM",tk:"Python, FastAPI, ChromaDB, HuggingFace"}},
@@ -187,6 +374,7 @@ button,input,select,textarea{font-family:inherit}
   }
 
   function render() {
+    if (!activeUser) { renderLogin(); return; }
     var m = $("main");
     $("bDay").textContent = "Day " + dayNum() + "/60";
     var html = "";
@@ -205,6 +393,8 @@ button,input,select,textarea{font-family:inherit}
     }
     m.innerHTML = html;
     switch (activeTab) {
+      case 0: bindDash(); break;
+      case 1: bindToday(); break;
       case 2: bindCurr(); break;
       case 3: bindTracker(); break;
       case 4: bindQuiz(); break;
@@ -216,6 +406,7 @@ button,input,select,textarea{font-family:inherit}
     }
   }
 
+  // ── Dashboard ─────────────────────────────────────────────────
   function pgDash() {
     var day = dayNum(), wk = weekNum(), cw = CUR[wk - 1];
     var dsaT=0,dsaD=0,sdT=0,sdD=0,aiT=0,aiD=0,pjD=0;
@@ -237,9 +428,16 @@ button,input,select,textarea{font-family:inherit}
     var tracks = [["DSA", dsaD, dsaT, "--blue"], ["System Design", sdD, sdT, "--yellow"], ["AI/ML", aiD, aiT, "--pink"], ["Projects", pjD, 8, "--green"]];
     tracks.forEach(function(r) { var p = pct(r[1], r[2]); h += '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:.8rem"><span>' + r[0] + '</span><span>' + p + '%</span></div><div class="pbar"><div class="pfill" style="width:' + p + '%;background:var(' + r[3] + ')"></div></div></div>'; });
     h += '</div>';
-    h += '<div class="card"><div class="ct">60-Day Heatmap</div><div class="hm">';
+    h += '<div class="card"><div class="ct">60-Day Heatmap</div>';
+    h += '<p style="font-size:.72rem;color:var(--text3);margin-bottom:8px">Click an active day to reset it</p>';
+    h += '<div class="hm">';
     var s = new Date(D.startDate + "T00:00:00");
-    for (var i = 0; i < 60; i++) { var dd = new Date(s.getTime() + i * 864e5).toISOString().split("T")[0]; var lv = Math.min(4, D.heat[dd] || 0); h += '<div class="hc' + (lv ? " h" + lv : "") + '" title="' + dd + '"></div>'; }
+    for (var i = 0; i < 60; i++) {
+      var dd = new Date(s.getTime() + i * 864e5).toISOString().split("T")[0];
+      var lv = Math.min(4, D.heat[dd] || 0);
+      var attrs = lv ? (' data-hd="' + dd + '"') : '';
+      h += '<div class="hc' + (lv ? " h" + lv : "") + '"' + attrs + ' title="' + dd + '"></div>';
+    }
     h += '</div></div></div>';
     if (cw) {
       h += '<div class="card"><div class="ct">Week ' + wk + ': ' + cw.t + '</div><div class="g4">';
@@ -252,6 +450,20 @@ button,input,select,textarea{font-family:inherit}
     return h;
   }
 
+  function bindDash() {
+    document.querySelectorAll(".hc[data-hd]").forEach(function(el) {
+      el.addEventListener("click", function() {
+        var date = el.getAttribute("data-hd");
+        if (confirm("Reset activity for " + date + "?\nThis clears daily blocks, LeetCode log, journal, and heatmap for this date.")) {
+          resetDay(date);
+          render();
+          toast("Day " + date + " reset", "var(--yellow)");
+        }
+      });
+    });
+  }
+
+  // ── Today ─────────────────────────────────────────────────────
   function pgToday() {
     var wk = weekNum(), cw = CUR[wk-1], day = dayNum(), dw = (day-1) % 8;
     var ds = new Date().toLocaleDateString("en-US", {weekday:"long", month:"long", day:"numeric"});
@@ -260,15 +472,20 @@ button,input,select,textarea{font-family:inherit}
     var ai = cw ? cw.ai[Math.min(dw, cw.ai.length-1)].split("|")[0] : "Practice";
     var pj = cw ? cw.pj.n + ": " + cw.pj.d : "Portfolio";
     var h = '<div class="card"><div class="ct">Today &mdash; ' + ds + '</div><p style="font-size:.8rem;color:var(--text2);margin-bottom:14px">5:00 AM - 11:00 AM learning block</p>';
-    var blocks = [["5:00-5:15","sched","Morning Recap","Review yesterday"],["5:15-6:30","sched","DSA + LeetCode",dsa],["6:30-7:30","sched","System Design",sd],["7:30-8:30","sched","AI/ML + Open Source",ai],["8:30-9:45","sched","Project Building",pj],["9:45-10:30","sched","Deep Reading","Papers, docs"],["10:30-11:00","sched","Quiz + Journal","Test and reflect"]];
+    var blocks = [["5:00-5:15","Morning Recap","Review yesterday"],["5:15-6:30","DSA + LeetCode",dsa],["6:30-7:30","System Design",sd],["7:30-8:30","AI/ML + Open Source",ai],["8:30-9:45","Project Building",pj],["9:45-10:30","Deep Reading","Papers, docs"],["10:30-11:00","Quiz + Journal","Test and reflect"]];
     var colors = ["var(--accent2)","var(--blue)","var(--yellow)","var(--pink)","var(--green)","var(--cyan)","var(--red)"];
-    blocks.forEach(function(b, i) { h += '<div class="sched" style="border-left-color:' + colors[i] + '"><div class="tm">' + b[0] + '</div><div class="dt"><h4>' + b[2] + '</h4><p>' + b[3] + '</p></div></div>'; });
+    blocks.forEach(function(b, i) { h += '<div class="sched" style="border-left-color:' + colors[i] + '"><div class="tm">' + b[0] + '</div><div class="dt"><h4>' + b[1] + '</h4><p>' + b[2] + '</p></div></div>'; });
     h += '</div>';
     var prompt = "Day " + day + "/60 of Project Change.\nWeek " + wk + ": " + (cw ? cw.t : "") + "\n\nSchedule:\n- DSA: " + dsa + "\n- System Design: " + sd + "\n- AI/ML: " + ai + "\n- Project: " + pj + "\n\nStack: Python+FastAPI. LC: hitman567. HF: ayushkt.\nGoal: MAANG + AI/ML in 60 days.\n\nHelp me through today. Start with DSA patterns, then let me solve. Mini-quiz after each section. Build the project together.";
     h += '<div class="pb"><h4>Claude Code Prompt for Today</h4><div style="position:relative"><pre id="tPr">' + esc(prompt) + '</pre><button class="cpb" id="tCp">Copy</button></div></div>';
     return h;
   }
+  function bindToday() {
+    var cp = $("tCp");
+    if (cp) cp.addEventListener("click", function() { navigator.clipboard.writeText($("tPr").textContent); toast("Copied!"); });
+  }
 
+  // ── Curriculum ────────────────────────────────────────────────
   function pgCurr() {
     cWeek = weekNum() - 1;
     var h = '<div class="card"><div class="ct">8-Week Curriculum</div><div class="wtabs" id="wt">';
@@ -286,10 +503,6 @@ button,input,select,textarea{font-family:inherit}
       });
     });
     drawWeek();
-    if (activeTab === 1) {
-      var cp = $("tCp");
-      if (cp) cp.addEventListener("click", function() { navigator.clipboard.writeText($("tPr").textContent); toast("Copied!"); });
-    }
   }
   function drawWeek() {
     var w = CUR[cWeek], i = cWeek;
@@ -321,6 +534,7 @@ button,input,select,textarea{font-family:inherit}
     return '<div class="ti" data-k="' + key + '"><input type="checkbox"' + (D.done[key] ? " checked" : "") + ' tabindex="-1"><span class="tn">' + name + '</span><span class="tt ' + tc(tag) + '">' + tag + '</span></div>';
   }
 
+  // ── Tracker ───────────────────────────────────────────────────
   function pgTracker() {
     var td = today();
     if (!D.daily[td]) D.daily[td] = {};
@@ -350,6 +564,7 @@ button,input,select,textarea{font-family:inherit}
     $("lcA").addEventListener("click", function() { var n = $("lcN").value.trim(); if (!n) return; D.lc.push({n: n, df: $("lcD").value, s: $("lcS").value, dt: today()}); save(); render(); recAct(); toast("Logged!"); });
   }
 
+  // ── Quiz ──────────────────────────────────────────────────────
   function pgQuiz() {
     var h = '<div class="card"><div class="ct">Daily Quiz</div><p style="font-size:.8rem;color:var(--text2);margin-bottom:12px">Test your learning</p>';
     h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">';
@@ -392,6 +607,7 @@ button,input,select,textarea{font-family:inherit}
     });
   }
 
+  // ── Recap ─────────────────────────────────────────────────────
   function pgRecap() {
     var items = D.recap || [];
     var h = '<div class="card"><div class="ct">Morning Recap</div>';
@@ -415,6 +631,7 @@ button,input,select,textarea{font-family:inherit}
     $("rI").addEventListener("keydown", function(e) { if (e.key === "Enter") $("rA").click(); });
   }
 
+  // ── Projects ──────────────────────────────────────────────────
   function pgProjects() {
     var h = '<div class="card"><div class="ct">Projects</div>';
     CUR.forEach(function(w, i) { h += tiHTML("p"+i, "Wk "+(i+1)+": "+w.pj.n+" - "+w.pj.d, "project"); });
@@ -436,6 +653,7 @@ button,input,select,textarea{font-family:inherit}
     $("pA").addEventListener("click", function() { var n = $("pN").value.trim(); if (!n) return; D.projects.push({n: n, d: $("pD").value.trim(), tk: $("pT").value.trim(), done: false}); save(); render(); toast("Added!"); });
   }
 
+  // ── Resources ─────────────────────────────────────────────────
   function pgResources() {
     function ri(ic, t, u, d) { return '<div class="ri"><div class="ic">' + ic + '</div><div class="inf"><div class="tl"><a href="' + u + '" target="_blank">' + t + '</a></div><div class="ds">' + d + '</div></div></div>'; }
     var h = '<div class="g2">';
@@ -447,6 +665,7 @@ button,input,select,textarea{font-family:inherit}
     return h;
   }
 
+  // ── Profiles ──────────────────────────────────────────────────
   function pgProfiles() {
     var h = '<div class="card"><div class="ct">Profiles</div><div class="g3">';
     h += '<a href="https://leetcode.com/u/hitman567/" target="_blank" class="pc"><div class="av" style="background:#FFA116;color:#000">LC</div><div><h4>LeetCode</h4><p style="font-size:.78rem;color:var(--text2)">hitman567</p></div></a>';
@@ -462,6 +681,7 @@ button,input,select,textarea{font-family:inherit}
   }
   function bindProfiles() { $("sSv").addEventListener("click", function() { D.stats = {lc: +$("sLC").value, gh: +$("sGH").value, hf: +$("sHF").value}; save(); toast("Saved!"); }); }
 
+  // ── Journal ───────────────────────────────────────────────────
   function pgJournal() {
     var h = '<div class="card"><div class="ct">Journal</div>';
     h += '<textarea class="ja" id="jT" placeholder="What did you learn? What clicked? What was hard?">' + (D.journals[today()] || "") + '</textarea>';
@@ -479,28 +699,66 @@ button,input,select,textarea{font-family:inherit}
     });
   }
 
+  // ── Settings ──────────────────────────────────────────────────
   function pgSettings() {
     var h = '<div class="card"><div class="ct">Settings</div>';
     h += '<div style="margin-bottom:16px"><label style="font-size:.8rem;color:var(--text2)">Start Date</label><input type="date" class="inp" id="sD" value="' + D.startDate + '" style="display:block;margin-top:3px"></div>';
+
+    h += '<div style="margin-bottom:20px"><div style="font-size:.9rem;font-weight:700;color:var(--accent2);margin-bottom:6px">Reset Specific Day</div>';
+    h += '<p style="font-size:.78rem;color:var(--text2);margin-bottom:10px">Clear all activity (blocks, journal, heatmap) for a chosen date.</p>';
+    h += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+    h += '<input type="date" class="inp" id="rdDate" value="' + today() + '">';
+    h += '<button class="btn bo" id="rdBtn" style="border-color:var(--yellow);color:var(--yellow)">Reset This Day</button>';
+    h += '</div></div>';
+
+    h += '<div style="border-top:1px solid var(--border);padding-top:16px">';
+    h += '<div style="font-size:.9rem;font-weight:700;color:var(--accent2);margin-bottom:10px">Data</div>';
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
     h += '<button class="btn bp" id="sEx">Export JSON</button>';
     h += '<button class="btn bo" id="sIm">Import</button><input type="file" id="sIF" accept=".json" style="display:none">';
-    h += '<button class="btn bo" id="sR" style="border-color:var(--red);color:var(--red)">Reset All</button>';
-    h += '</div></div>';
+    h += '<button class="btn bo" id="sR" style="border-color:var(--red);color:var(--red)">Reset All My Data</button>';
+    h += '</div></div></div>';
     return h;
   }
   function bindSettings() {
     $("sD").addEventListener("change", function() { D.startDate = $("sD").value; save(); render(); toast("Updated!"); });
-    $("sEx").addEventListener("click", function() { var b = new Blob([JSON.stringify(D, null, 2)], {type:"application/json"}); var u = URL.createObjectURL(b); var a = document.createElement("a"); a.href = u; a.download = "project-change-backup.json"; a.click(); URL.revokeObjectURL(u); toast("Exported!"); });
+
+    $("rdBtn").addEventListener("click", function() {
+      var date = $("rdDate").value;
+      if (!date) return;
+      if (confirm("Reset all activity for " + date + "?\nThis clears daily blocks, journal, and heatmap for that date.")) {
+        resetDay(date);
+        toast("Day " + date + " reset", "var(--yellow)");
+      }
+    });
+
+    $("sEx").addEventListener("click", function() { var b = new Blob([JSON.stringify(D, null, 2)], {type:"application/json"}); var u = URL.createObjectURL(b); var a = document.createElement("a"); a.href = u; a.download = "project-change-" + (activeUser || "backup") + ".json"; a.click(); URL.revokeObjectURL(u); toast("Exported!"); });
     $("sIm").addEventListener("click", function() { $("sIF").click(); });
-    $("sIF").addEventListener("change", function(e) { var f = e.target.files[0]; if (!f) return; var r = new FileReader(); r.onload = function(ev) { try { D = Object.assign({}, DEF, JSON.parse(ev.target.result)); save(); location.reload(); } catch(er) { toast("Invalid file"); } }; r.readAsText(f); });
-    $("sR").addEventListener("click", function() { if (confirm("Reset ALL data?")) { localStorage.removeItem(KEY); location.reload(); } });
+    $("sIF").addEventListener("change", function(e) { var f = e.target.files[0]; if (!f) return; var r = new FileReader(); r.onload = function(ev) { try { D = Object.assign({}, DEF, JSON.parse(ev.target.result)); save(); location.reload(); } catch(er) { toast("Invalid file", "var(--red)"); } }; r.readAsText(f); });
+    $("sR").addEventListener("click", function() {
+      if (confirm("Reset ALL data for " + activeUser + "? This cannot be undone.")) {
+        if (activeUser) {
+          localStorage.removeItem(getUserKey(activeUser));
+        } else {
+          localStorage.removeItem(LEGACY_KEY);
+        }
+        location.reload();
+      }
+    });
   }
 
-  // Boot
+  // ── Boot ──────────────────────────────────────────────────────
   buildNav();
-  updateStreak();
-  render();
+  $("uBtn").addEventListener("click", showProfileModal);
+
+  if (activeUser) {
+    $("nav").style.display = "";
+    updateUserDisplay();
+    updateStreak();
+    render();
+  } else {
+    renderLogin();
+  }
 
 })();
 </script>
