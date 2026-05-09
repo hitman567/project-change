@@ -628,12 +628,15 @@
   // ── Journal ───────────────────────────────────────────────────
   function pgJournal() {
     var h = '<div class="card"><div class="ct">Journal</div>';
-    h += '<textarea class="ja" id="jT" placeholder="What did you learn? What clicked? What was hard?">' + (D.journals[today()] || "") + '</textarea>';
+    // textarea content is set via .value in bindJournal, not via innerHTML string concat,
+    // to prevent </textarea> injection from malicious JSON imports
+    h += '<textarea class="ja" id="jT" placeholder="What did you learn? What clicked? What was hard?"></textarea>';
     h += '<div style="margin-top:8px;display:flex;gap:6px"><button class="btn bp" id="jS">Save</button><button class="btn bo" id="jP">Past Entries</button></div>';
     h += '<div id="jH"></div></div>';
     return h;
   }
   function bindJournal() {
+    $("jT").value = D.journals[today()] || "";
     $("jS").addEventListener("click", function () {
       var t = $("jT").value.trim();
       if (!t) return;
